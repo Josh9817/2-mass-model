@@ -1,0 +1,423 @@
+#2 Mass Model for Heave using Jupyter QTConsole- JJH 4/22/16
+
+
+
+# Grab all of the NumPy functions with namespace (nickname) np
+import numpy as np
+
+
+
+# Set up the notebook to display plots inline
+%matplotlib inline
+
+# Import the plotting functions 
+import matplotlib.pyplot as plt
+
+
+# Define the Length, OD, and Weight (lb/ft) of each Landing String section (up to four sections, 1 is top and 4 is bottom)
+LS1 = 6000	#ft
+ODLS1 = 6.625	#in
+PPFLS1 = 50	#lb/ft
+
+LS2 = 0		#ft
+ODLS2 = 0	#in
+PPFLS2 = 0	#lb/ft
+
+LS3 = 0		#ft
+ODLS3 = 0	#in
+PPFLS3 = 0	#lb/ft
+
+LS4 = 0		#ft
+ODLS4 = 0	#in
+PPFLS4 = 0	#lb/ft
+
+# Define the Length, OD, and Weight (lb/ft) of each Casing String section (up to four sections, 1 is top and 4 is bottom)
+CS1 = 11000	#ft
+ODCS1 = 14	#in
+PPFCS1 = 115.53	#lb/ft
+
+CS2 = 0		#ft
+ODCS2 = 0	#in
+PPFCS2 = 0	#lb/ft
+
+CS3 = 0		#ft
+ODCS3 = 0	#in
+PPFCS3 = 0	#lb/ft
+
+CS4 = 0		#ft
+ODCS4 = 0	#in
+PPFCS4 = 0	#lb/ft
+
+# Calculate the mass of each string section
+mLS1 = LS1 * PPFLS1	#lb
+mLS2 = LS2 * PPFLS2	#lb
+mLS3 = LS3 * PPFLS3	#lb
+mLS4 = LS4 * PPFLS4	#lb
+mCS1 = CS1 * PPFCS1	#lb
+mCS2 = CS2 * PPFCS2	#lb
+mCS3 = CS3 * PPFCS3	#lb
+mCS4 = CS4 * PPFCS4	#lb
+
+M2 = mLS1 + mLS2 + mLS3 + mLS4 + mCS1 + mCS2 + mCS3 + mCS4	#lb
+
+# Define string density and modulus of elasticity
+# Assuming all string sections are steel
+rho = .284	#lb/in^3
+E = 30e6	#psi
+
+# Calculate the Area of each string section
+ALS1 = PPFLS1/(rho * 12)	#in^2
+ALS2 = PPFLS2/(rho * 12)	#in^2
+ALS3 = PPFLS3/(rho * 12)	#in^2
+ALS4 = PPFLS4/(rho * 12)	#in^2
+ACS1 = PPFCS1/(rho * 12)	#in^2
+ACS2 = PPFCS2/(rho * 12)	#in^2
+ACS3 = PPFCS3/(rho * 12)	#in^2
+ACS4 = PPFCS4/(rho * 12)	#in^2
+
+# Calculate numerator of Xcg.  x1 to x8 are the distances from the drillship to the cg of the string section (1 to 8).
+if LS1 == 0:
+	x1 = 0
+else:
+	x1 = LS1/2
+
+if LS2 == 0:
+	x2 = 0
+else:
+	x2 = LS1 + LS2/2
+
+if LS3 == 0:
+	x3 = 0
+else:
+	x3 = LS1 + LS2 + LS3/2
+
+if LS4 == 0:
+	x4 = 0
+else:
+	x4 = LS1 + LS2 + LS3 + LS4/2
+
+if CS1 == 0:
+	x5 = 0
+else:
+	x5 = LS1 + LS2 + LS3 + LS4 + CS1/2
+
+if CS2 == 0:
+	x6 = 0
+else:
+	x6 = LS1 + LS2 + LS3 + LS4 + CS1 + CS2/2
+
+if CS3 == 0:
+	x7 = 0
+else:
+	x7 = LS1 + LS2 + LS3 + LS4 + CS1 + CS2 + CS3/2
+
+if CS4 == 0:
+	x8 = 0
+else:
+	x8 = LS1 + LS2 + LS3 + LS4 + CS1 + CS2 + CS3 + CS4/2	#ft
+
+Xcg = (x1*mLS1 + x2*mLS2 + x3*mLS3 + x4*mLS4 + x5*mCS1 + x6*mCS2 + x7*mCS3 + x8*mCS4)/(M2)	#ft
+
+# Calculate the k's of the string sections
+if LS1 == 0:
+	k1 = 0
+else:
+	if Xcg < LS1:
+		k1 = ALS1 * E / Xcg
+	else:
+		k1 = ALS1 * E / (LS1)
+
+if LS2 == 0:
+	k2 = 0
+else:
+	if Xcg > x2:
+		k2 = ALS2 * E / (min(LS2,(Xcg - x2 + LS2/2)))
+	else:
+		if Xcg < (x1 + LS1/2):
+			k2 = 0
+		else:
+			k2 = ALS2 * E / (Xcg - x1 + LS1/2)
+
+if LS3 == 0:
+	k3 = 0
+else:
+	if Xcg > x3:
+		k3 = ALS3 * E / (min(LS3,(Xcg - x3 + LS3/2)))
+	else:
+		if Xcg < (x2 + LS2/2):
+			k3 = 0
+		else:
+			k3 = ALS3 * E / (Xcg - x2 + LS2/2)
+	
+if LS4 == 0:
+	k4 = 0
+else:
+	if Xcg > x4:
+		k4 = ALS4 * E / (min(LS4,(Xcg - x4 + LS4/2)))
+	else:
+		if Xcg < (x3 + LS3/2):
+			k4 = 0
+		else:
+			k4 = ALS4 * E / (Xcg - x3 + LS3/2)
+
+if CS1 == 0:
+	k5 = 0
+else:
+	if Xcg > x5:
+		k5 = ACS1 * E / (min(CS1,(Xcg - x5 + CS1/2)))
+	else:
+		if Xcg < (x4 + LS4/2):
+			k5 = 0
+		else:
+			k5 = ACS1 * E / (Xcg - x4 + LS4/2)
+
+if CS2 == 0:
+	k6 = 0
+else:
+	if Xcg > x6:
+		x6 = ACS2 * E / (min(CS2,(Xcg - x6 + CS2/2)))
+	else:
+		if Xcg < (x5 + CS1/2):
+			k6 = 0
+		else:
+			k6 = ACS2 * E / (Xcg - x5 + CS1/2)
+
+if CS3 == 0:
+	k7 = 0
+else:
+	if Xcg > x7:
+		x7 = ACS3 * E / (min(CS3,(Xcg - x7 + CS3/2)))
+	else:
+		if Xcg < (x6 + CS2/2):
+			k7 = 0
+		else:
+			k7 = ACS3 * E / (Xcg - x6 + CS2/2)
+
+if CS4 == 0:
+	k8 = 0
+else:
+	if Xcg > x8:
+		x8 = ACS4 * E / (min(CS4,(Xcg - x8 + CS4/2)))
+	else:
+		if Xcg < (x7 + CS3/2):
+			k8 = 0
+		else:
+			k8 = ACS4 * E / (Xcg - x7 + CS3/2)
+
+
+#calculate inverse k's
+
+if k1 == 0:
+	k1I = 0
+else:
+	k1I = 1/k1
+if k2 == 0:
+	k2I = 0
+else:
+	k2I = 1/k2
+if k3 == 0:
+	k3I = 0
+else:
+	k3I = 1/k3
+if k4 == 0:
+	k4I = 0
+else:
+	k4I = 1/k4
+if k5 == 0:
+	k5I = 0
+else:
+	k5I = 1/k5
+if k6 == 0:
+	k6I = 0
+else:
+	k6I = 1/k6
+if k7 == 0:
+	k7I = 0
+else:
+	k7I = 1/k7
+if k8 == 0:
+	k8I = 0
+else:
+	k8I = 1/k8
+
+#calculate equivalent K2
+
+K2 = 1/(k1I + k2I + k3I + k4I + k5I + k6I + k7I + k8I)
+
+#for K2 and M2 in lb rather than kips, uncomment/comment below
+#print('K2 = ',round(K2,-3),'lb/ft')
+#print('M2 = ',round(M2,-3),'lb')
+print('K2 = ',round(K2/1000,0),'kip/ft')
+print('M2 = ',round(M2/1000,0),'kip')
+
+#end of determining M2 and K2 - JJH 4/23/16
+#Solving the Equations of Motion
+#Define Ship Mass (M1) and Hydrodynamic Response (K1).
+M1 = 200000	#kip
+K1 = 4000	#kip/ft
+
+
+
+
+
+
+
+##########################################################Sample Results#############################################################
+#LSA Chevron Coronado 3 WR 143_
+#K2 =  43.0 kip/ft
+#M2 =  1571.0 kip
+
+# Define the Length, OD, and Weight (lb/ft) of each Landing String section (up to four sections, 1 is top and 4 is bottom)
+LS1 = 6000	#ft
+ODLS1 = 6.625	#in
+PPFLS1 = 50	#lb/ft
+
+LS2 = 0		#ft
+ODLS2 = 0	#in
+PPFLS2 = 0	#lb/ft
+
+LS3 = 0		#ft
+ODLS3 = 0	#in
+PPFLS3 = 0	#lb/ft
+
+LS4 = 0		#ft
+ODLS4 = 0	#in
+PPFLS4 = 0	#lb/ft
+
+# Define the Length, OD, and Weight (lb/ft) of each Casing String section (up to four sections, 1 is top and 4 is bottom)
+CS1 = 11000	#ft
+ODCS1 = 14	#in
+PPFCS1 = 115.53	#lb/ft
+
+CS2 = 0		#ft
+ODCS2 = 0	#in
+PPFCS2 = 0	#lb/ft
+
+CS3 = 0		#ft
+ODCS3 = 0	#in
+PPFCS3 = 0	#lb/ft
+
+CS4 = 0		#ft
+ODCS4 = 0	#in
+PPFCS4 = 0	#lb/ft
+############################################################################################################################################
+
+##########################################################Sample Results####################################################################
+#DCL Chevron Jack PS004 REV A 12_6_11 - 13 3/4 Tie Back
+#K2 =  34.0 kip/ft
+#M2 =  1958.0 kip
+# # Define the Length, OD, and Weight (lb/ft) of each Landing String section (up to four sections, 1 is top and 4 is bottom)
+#LS1 = 5600	#ft
+#ODLS1 = 6.625	#in
+#PPFLS1 = 56.89	#lb/ft
+
+#LS2 = 1437		#ft
+#ODLS2 = 6.625	#in
+#PPFLS2 = 50	#lb/ft
+
+#LS3 = 0		#ft
+#ODLS3 = 0	#in
+#PPFLS3 = 0	#lb/ft
+
+#LS4 = 0		#ft
+#ODLS4 = 0	#in
+#PPFLS4 = 0	#lb/ft
+
+# Define the Length, OD, and Weight (lb/ft) of each Casing String section (up to four sections, 1 is top and 4 is bottom)
+#CS1 = 15905	#ft
+#ODCS1 = 13.75	#in
+#PPFCS1 = 98.58	#lb/ft
+
+#CS2 = 0		#ft
+#ODCS2 = 0	#in
+#PPFCS2 = 0	#lb/ft
+
+#CS3 = 0		#ft
+#ODCS3 = 0	#in
+#PPFCS3 = 0	#lb/ft
+
+#CS4 = 0		#ft
+#ODCS4 = 0	#in
+#PPFCS4 = 0	#lb/ft
+#############################################################################################################################################
+
+##########################################################Sample Results########################################################################
+#DIN Chevron St. Malo PS001 Rev A_4-24-2012
+#K2 =  34.0 kip/ft
+#M2 =  1929.0 kip
+
+# Define the Length, OD, and Weight (lb/ft) of each Landing String section (up to four sections, 1 is top and 4 is bottom)
+LS1 = 4633	#ft
+ODLS1 = 6.625	#in
+PPFLS1 = 56.89	#lb/ft
+
+LS2 = 2500		#ft
+ODLS2 = 6.625	#in
+PPFLS2 = 50	#lb/ft
+
+LS3 = 0		#ft
+ODLS3 = 0	#in
+PPFLS3 = 0	#lb/ft
+
+LS4 = 0		#ft
+ODLS4 = 0	#in
+PPFLS4 = 0	#lb/ft
+
+# Define the Length, OD, and Weight (lb/ft) of each Casing String section (up to four sections, 1 is top and 4 is bottom)
+CS1 = 15636	#ft
+ODCS1 = 13.75	#in
+PPFCS1 = 98.5	#lb/ft
+
+CS2 = 0		#ft
+ODCS2 = 0	#in
+PPFCS2 = 0	#lb/ft
+
+CS3 = 0		#ft
+ODCS3 = 0	#in
+PPFCS3 = 0	#lb/ft
+
+CS4 = 0		#ft
+ODCS4 = 0	#in
+PPFCS4 = 0	#lb/ft
+################################################################################################################################################
+
+##########################################################Sample Results#####################################################################
+#Diamond Ocean BlackHawk - Anadarko Shenandoah V Well Rev C 14" Liner (job run with James Fontenot 4/21/16 - )
+#K2 =  23.0 kip/ft
+#M2 =  1859.0 kip
+
+# Define the Length, OD, and Weight (lb/ft) of each Landing String section (up to four sections, 1 is top and 4 is bottom)
+LS1 = 19400	#ft
+ODLS1 = 6.625	#in
+PPFLS1 = 58.32	#lb/ft
+
+LS2 = 0		#ft
+ODLS2 = 0	#in
+PPFLS2 = 0	#lb/ft
+
+LS3 = 0		#ft
+ODLS3 = 0	#in
+PPFLS3 = 0	#lb/ft
+
+LS4 = 0		#ft
+ODLS4 = 0	#in
+PPFLS4 = 0	#lb/ft
+
+# Define the Length, OD, and Weight (lb/ft) of each Casing String section (up to four sections, 1 is top and 4 is bottom)
+CS1 = 6300	#ft
+ODCS1 = 14	#in
+PPFCS1 = 115.53	#lb/ft
+
+CS2 = 0		#ft
+ODCS2 = 0	#in
+PPFCS2 = 0	#lb/ft
+
+CS3 = 0		#ft
+ODCS3 = 0	#in
+PPFCS3 = 0	#lb/ft
+
+CS4 = 0		#ft
+ODCS4 = 0	#in
+PPFCS4 = 0	#lb/ft
+################################################################################################################################################
+
