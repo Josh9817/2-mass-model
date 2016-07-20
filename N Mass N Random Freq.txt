@@ -1,0 +1,327 @@
+import numpy as np              # Grab all of the NumPy functions with nickname np
+
+# We want our plots to be displayed inline, not in a separate window
+%matplotlib inline
+
+# Import the plotting functions  
+import matplotlib.pyplot as plt
+
+# Import the ODE solver for our time response analysis
+from scipy.integrate import odeint  
+
+#For random number generator
+import random
+
+# Define the System Parameters
+M0 = 90e6                 # kg (average weight of modern drillships ~200 Mlb)
+wn0 = .732                # Natural Frequency (rad/s) of the drillship from FFT of measured data,- 
+                          # typical range between .628 to .880 from literature
+K0 = wn0**2 * M0          # N/m 
+#wn = np.sqrt(k / m)      # Natural Frequency (rad/s)
+z0 = .1                   # Ship damping coefficient
+z1 = .1                   # String damping coefficient
+C0 = 2*M0*wn0*z0
+
+#z = 0.25                 # Define a desired damping ratio *commented out becasue this model assumes no damping
+#c = 2 * z * wn * m       # calculate the damping coeff. to create it (N/(m/s))*commented out becasue this model- 
+                          # assumes no damping
+
+#wd = wn*np.sqrt(1-z**2)  # Damped natural frequency (rad/s) *commented out becasue this model assumes no damping
+print("K0 = ",round(K0/1000,0),"kN/m")
+
+M1 = 888e3                # kg (calculated from 2 mass model code, total string weight)
+K1 = 496e3                # N/m (calculated from 2 mass model code, equivalent total string stiffness)
+wn1 = np.sqrt(K1/M1)      # Natural Frequency (rad/s) of total string
+C1 = 2*M1*wn1*z1
+
+#redefining K, C and M for N_m equivalent string elements rather than 1 combined element (from 2 mass model - ship & string)
+N_m = 20                 #specify the number of masses in the model, total
+K = np.linspace(1., N_m, N_m)
+C = np.linspace(1., N_m, N_m)
+M = np.linspace(1., N_m, N_m)
+
+#packing ship mass, stiffness, and damping into appropriate vectors
+M[0] = M0
+K[0] = K0
+C[0] = C0
+N_ms = N_m - 1            #elements in the string (minus one for the ship from the total number of masses in the model)
+
+K[1] = N_ms*K1
+M[1] = M1/N_ms
+C[1] = C1/N_ms
+
+#for simplicity, setting each string element equal to the first.  
+#this can be changed to a formula for the properties of each string element later
+i = 2
+while i <= N_ms:
+    K[i] = K[1]
+    M[i] = M[1]
+    C[i] = C[1]
+    i += 1
+    
+X=[]
+i=0
+while i < N_m:
+    #X.append('x%d'%(i))
+    #X.append('x%d_dot'%(i))
+    X.append(0)
+    X.append(0)
+    i+=1
+
+#builds initial size of sysODE, actual values to be determined in def block
+sysODE=[]
+i=0
+while i < N_m:
+    #sysODE.append('x%d_dot'%(i))
+    #sysODE.append('x%d_ddot'%(i))
+    sysODE.append(0)
+    sysODE.append(0)
+    i+=1
+
+
+    
+print(sysODE)
+print(X)
+
+
+
+
+def eq_of_motion(w, t, p):
+    [K, C, M, A, OMEGA, PHI, S] = p
+    X = w
+    
+    #defining the equation of motion of the ship
+    sysODE [0] = w[1]
+    sysODE [1] = -C[0]/M[0] * w[1] - (K[0] + K[1])/M[0] * w[0] + K[1]/M[0] * w[2] + K[0]/M[0] * x_wave(t, p)
+
+    #defining the equation of motion of the last (bottom) string element
+    sysODE[-2] = w[-1]
+    sysODE[-1] = -C[-1]/M[-1] * w[-1] + K[-1]/M[-1] * w[-4] - K[-1]/M[-1] * w[-2]
+
+    #defining the equations of motion of the x_ddots of the top and intermediate string elements
+    i=2
+    j=1
+    while j < N_ms:
+        sysODE[i] = w[i+1]
+        sysODE[i+1] = -C[j]/M[j] * w[i+1] + K[j]/M[j] * w[i-2] - (K[j] + K[j+1])/M[j] * w[i] + K[j+1]/M[j] * w[i+2]
+        i += 2
+        j += 1
+    
+    return sysODE
+
+print("K = ",K[0]/1000,"kN/m")
+print("K3 = ",round(K[3]/1000,0),"kN/m")
+print("K9 = ",round(K[9]/1000,0),"kN/m")
+print("M2 = ",round(M[2]/1000,0),"e3kg")
+print("M3 = ",round(M[3]/1000,0),"e3kg")
+print("M10 = ",round(M[4]/1000,0),"e3kg")
+print("C2 = ",round(C[2]/1000, 0), "e3kg/s")
+print("C3 = ",round(C[3]/1000,0), "e3kg/s")
+print("C10 = ",round(C[4]/1000,0), "e3kg/s")
+print("wn1 =",round(wn1,3),"rad/s")
+print(sysODE[1])
+
+
+
+
+# Setting up the matrices
+
+#def Wss(w,t,p):                              #Wss = W state-space function
+#A = np.array([[0,1,0,0],[-(K1+K2)/M1,0,K2/M1,0],[0,0,0,1],[K2/M2,0,-K2/M2,0]])
+
+#defining the values of the W matrix
+###############################################################################################################Bobby's PM Top
+#PM Wave Height from Bobby's PM Spectrum code
+
+# ODE solver parameters
+abserr = 1.0e-9
+relerr = 1.0e-9
+max_step = 0.01
+stoptime = 1200.0                 #seconds
+numpoints = 10001
+
+# Set up the parameters for the input function
+StartTime = 0.0              # Time the f(t) input will begin
+A_amp = 2.0                # Amplitude of Disturbance wave (m)
+omega = 1     # Natural Frequency (rad/s) of waves
+
+# Create the time samples for the output of the ODE solver
+t = np.linspace(0.0, stoptime, numpoints)
+stoptimemin = stoptime/60
+
+#Bobby's Parameters:
+#     Declaration of variables
+V_knots = 25.     # In knots 15 original
+g = 9.81          # Gravity m/s^2
+N = 100            # Number of desired frequencies
+
+A = np.linspace(1., N, N)
+OMEGA = np.linspace(1., N, N)
+PHI = np.linspace(1., N, N)
+S = np.linspace(1., N, N)
+
+OMEGA[0] = .25     #rad/s
+OMEGA[-1] = 3.5       #rad/s
+PHI[0] = 0         #rad
+PHI[-1] = 2*np.pi   #rad
+
+#V_knots, g, omega, A_sp, B_sp, S, delta_omega, A_i, omega_i, g, t, phi_i, 
+V = V_knots * 0.5144    # Conversion from knots to m/s
+H_s = 0.21 * (V**2 / g) #m
+
+A_sp = 8.1 * 10**-3 * g**2
+B_sp = 3.11 / H_s**2
+
+delta_omega = (OMEGA[-1] - OMEGA[0])/N
+delta_phi = (PHI[1] - PHI[0])/N
+i = 1
+while i < N - 1:
+    OMEGA[i] = OMEGA[0] + random.random() * (OMEGA[-1] - OMEGA[0])  #ref. Seakeeping, Chapter 2, Pg. 43
+    PHI[i] = delta_phi + PHI[i-1]
+    i+=1
+OMEGA.sort()
+
+#+np.pi*rand() or rand() - rand()  to center the random number about pi or 0
+#  IS THIS RANGE OF PHI SUFFICIENT TO GENERATE RANDOM VALUES?  THIS PROCEDURE DIVIDES THE COMPLETE REVOLUTION RANGE BY N.
+
+i=0
+while i < N:
+    S[i] = (A_sp / OMEGA[i]**5) * np.exp(-B_sp / OMEGA[i]**4)
+    A[i] = np.sqrt(2 * S[i] * delta_omega)
+    i+=1
+
+
+###############################################################################################################Bobby's PM Bot
+
+
+def x_wave(t, p):
+    """
+    defines the disturbance wave input to the system
+    """
+    [K, C, M, A, OMEGA, PHI, S] = p
+    #[M1, M2, M3, M4, M5, M6, M7, M8, M9, M10, K1, K2, K3, K4, K5, K6, K7, K8, K9, K10, StartTime, A_amp, omega, A_1, A_2, A_3, A_4, A_5, omega_1, omega_2, omega_3, omega_4, omega_5,
+     #phi_1, phi_2, phi_3, phi_4, phi_5, C1, C2, C3, C4, C5, C6, C7, C8, C9, C10] = p
+    
+    #    Need to sum up several omega's from Bobby's PM Spectrum notebook here
+#    x_wave = K1/M1 * A_amp * np.sin(omega * t)   #original wave input, single frequency and amplitude, no phase shift
+#    x_wave = K1/M1 * (A_amp * np.sin(omega * t) + A_amp*1.1342 * np.sin(omega*t*1.2452+1.1452) 
+#                      + A_amp*.8956 * np.sin(omega*t*1.6+3.56) + A_amp*1.425 * np.sin(omega*t*.526+5.263)
+#                     + A_amp*.6854 * np.sin(omega*t*.428+4.5356))  #2nd wave input, combination of 5 
+#                                                                   randomly chosen frequencies
+#    x_wave = K1/M1 * A_amp * np.sin(omega * t)
+    x_wave_sum = 0
+    i=0
+    while i < N:
+        x_wave_sum += A[i] * np.sin(OMEGA[i] * t + PHI[i])
+        i+=1
+        
+    x_wave = x_wave_sum  #K[0]/M[0] * 
+    #(A_1 * np.sin(omega_1 * t + phi_1) + A_2 * np.sin(omega_2 * t + phi_2) +
+                      # A_3 * np.sin(omega_3 * t + phi_3) + A_4 * np.sin(omega_4 * t + phi_4) +
+                      # A_5 * np.sin(omega_5 * t + phi_5))
+    return x_wave
+
+              
+#print('x_wave = ', x_wave(t,p))
+#print(x_wave(t,p))
+#print(A)
+#print(OMEGA)
+
+
+
+
+# Set up simulation parameters
+
+# Initial conditions
+x1_init = 0.0                        # initial position
+x1_dot_init = 0.0                    # initial velocity
+x2_init = 0.0                        # initial position
+x2_dot_init = 0.0                    # initial velocity
+x3_init = 0.0                        # initial position
+x3_dot_init = 0.0                    # initial velocity
+x4_init = 0.0                        # initial position
+x4_dot_init = 0.0                    # initial velocity
+x5_init = 0.0                        # initial position
+x5_dot_init = 0.0                    # initial velocity
+x6_init = 0.0                        # initial position
+x6_dot_init = 0.0                    # initial velocity
+x7_init = 0.0                        # initial position
+x7_dot_init = 0.0                    # initial velocity
+x8_init = 0.0                        # initial position
+x8_dot_init = 0.0                    # initial velocity
+x9_init = 0.0                        # initial position
+x9_dot_init = 0.0                    # initial velocity
+x10_init = 0.0                       # initial position
+x10_dot_init = 0.0                   # initial velocity
+
+Xinit=[]
+i=0
+while i < N_m:
+    Xinit.append(0)
+    Xinit.append(0)
+    i+=1
+
+# Pack the parameters and initial conditions into arrays  
+p = [K, C, M, A, OMEGA, PHI, S]
+x0 = Xinit
+#print(x0)
+
+
+
+
+# Call the ODE solver.
+resp = odeint(eq_of_motion, x0, t, args=(p,), atol=abserr, rtol=relerr,  hmax=max_step)
+
+
+
+
+# Make the figure pretty, then plot the results
+#   "pretty" parameters selected based on pdf output, not screen output
+#   Many of these setting could also be made default by the .matplotlibrc file
+
+# Set the plot size - 3x2 aspect ratio is best
+fig = plt.figure(figsize=(15, 10)) #original (6,4)
+ax = plt.gca()
+plt.subplots_adjust(bottom=0.17, left=0.17, top=0.96, right=0.96)
+
+# Change the axis units to serif
+plt.setp(ax.get_ymajorticklabels(),family='serif',fontsize=18)
+plt.setp(ax.get_xmajorticklabels(),family='serif',fontsize=18)
+
+ax.spines['right'].set_color('none')
+ax.spines['top'].set_color('none')
+
+ax.xaxis.set_ticks_position('bottom')
+ax.yaxis.set_ticks_position('left')
+
+# Turn on the plot grid and set appropriate linestyle and color
+ax.grid(True,linestyle=':',color='0.75')
+ax.set_axisbelow(True)
+
+# Define the X and Y axis labels
+plt.xlabel('$\omega$ (rad/s)', family='serif', fontsize=22, weight='bold', labelpad=5)
+plt.ylabel('Amplitude', family='serif', fontsize=22, weight='bold', labelpad=10)
+plt.title('%s knot Pierson-Moskowitz Wave Input\n $\omega_{range}$ = %s to %s rad/s\n N = %s random frequencies'%(V_knots, OMEGA[0], OMEGA[-1], N), family='serif', fontsize=22, weight='bold')
+
+# Plot the first element of resp for all time. It corresponds to the position.
+#plt.plot(t, resp[:,3], linewidth=2, color='salmon', linestyle = '--', label=r'String Velocity')
+plt.plot(OMEGA, A, linewidth=2, color='green', linestyle = '-', label=r'Wave Amplitude')
+#plt.plot(t, total_wave, linewidth=2, color='lightgreen', linestyle = '-', label=r'Wave Height')
+
+# uncomment below and set limits if needed
+#plt.xlim(0,stoptime)
+# ylim(0,10)
+
+# Create the legend, then fix the fontsize
+leg = plt.legend(loc='upper right', fancybox=True)
+ltext  = leg.get_texts()
+plt.setp(ltext,family='serif',fontsize=12)
+
+# Adjust the page layout filling the page using the new tight_layout command
+plt.tight_layout(pad = 0.5)
+
+# save the figure as a high-res pdf in the current folder
+# It's saved at the original 6x4 size
+#plt.savefig('%s knot Pierson-Moskowitz Wave Amplitude Spectrum %s to %s N = %s random frequencies.pdf'%(V_knots, OMEGA[0], OMEGA[-1], N)) #change file name to match plotted variable
+
+fig.set_size_inches(15, 10) # Resize the figure for better display in the notebook original (9,6)
